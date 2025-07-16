@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: trendscope-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: trendscope_db
+      MYSQL_USER: trendscope
+      MYSQL_PASSWORD: trendscope123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - trendscope-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: trendscope-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - trendscope-network
+
+  dummy-service:
+    build:
+      context: ./dummy-service
+      dockerfile: Dockerfile
+    container_name: trendscope-dummy-service
+    ports:
+      - "8081:8081"
+    networks:
+      - trendscope-network
+
+  microservice:
+    build:
+      context: ./microservice
+      dockerfile: Dockerfile
+    container_name: trendscope-microservice
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/trendscope_db
+      - SPRING_DATASOURCE_USERNAME=trendscope
+      - SPRING_DATASOURCE_PASSWORD=trendscope123
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - trendscope-network
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: trendscope-gateway
+    ports:
+      - "8090:8090"
+    depends_on:
+      - microservice
+      - dummy-service
+    networks:
+      - trendscope-network
+
+volumes:
+  mysql_data:
+
+networks:
+  trendscope-network:
+    driver: bridge
